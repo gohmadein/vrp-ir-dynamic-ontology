@@ -1,0 +1,6 @@
+fastapi>=0.110.0
+uvicorn[standard]>=0.29.0
+pydantic>=2.6.0
+z3-solver>=4.12.0
+# Huawei VRP configuration parser with field-level SourceRef provenance:
+vrp-ir @ git+https://github.com/zynovexllc/vrp-ir.git

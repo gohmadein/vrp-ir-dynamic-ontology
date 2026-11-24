@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>可执行动态网络本体 · vrp-ir × Z3 差分规划原型</title>
+  <link rel="stylesheet" href="/static/styles.css" />
+</head>
+<body>
+  <header class="site-header">
+    <div class="header-inner">
+      <div class="brand">
+        <span class="live-pill"><span class="live-dot"></span>DYNAMIC ONTOLOGY MVP</span>
+        <span>华为可执行动态网络本体 · <code>vrp-ir × Z3</code> 差分规划原型</span>
+      </div>
+      <div class="header-meta">
+        <span class="header-tag">O_dyn = ⟨C, R, F, A, I, Δ⟩</span>
+        <button type="button" id="btn-benchmark" class="meta-btn">📊 传统 vs 动态本体评测</button>
+        <button type="button" id="btn-api-modal" class="meta-btn ghost">🔑 BYOK LLM（可选）</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <!-- Control Strip -->
+    <section class="control-card">
+      <div class="scenario-col">
+        <div class="scenario-tabs" id="scenario-tabs"></div>
+        <div id="scenario-desc" class="scenario-desc">加载场景中...</div>
+      </div>
+      <div class="ctrl-actions">
+        <button type="button" id="btn-plan" class="primary-action-btn">🧠 运行动态本体沙箱规划</button>
+        <button type="button" id="btn-reset" class="secondary-action-btn">↺ 重置初始态</button>
+      </div>
+    </section>
+
+    <!-- Visual Hero: Topology <-> Dynamic Ontology Graph Switcher -->
+    <section class="hero-card">
+      <div class="hero-head">
+        <div class="hero-left">
+          <div class="mini-tabs" id="hero-view-tabs">
+            <button type="button" data-view="topo" aria-selected="true">🌐 3 设备物理/逻辑拓扑</button>
+            <button type="button" data-view="graph" aria-selected="false">🕸 动态本体语义图 (C, R)</button>
+          </div>
+          <span id="onto-stats" class="muted-tag">加载中...</span>
+        </div>
+        <div class="hero-pills">
+          <span id="pill-target" class="status-pill warn">目标检测中...</span>
+          <span id="pill-inv" class="status-pill ok">安全不变量检测中...</span>
+          <span id="pill-shadow" class="status-pill info">Z3 遮蔽检测中...</span>
+        </div>
+      </div>
+
+      <div id="hero-topo-wrap">
+        <svg id="topo-svg" class="topo-svg" viewBox="0 0 1120 132"></svg>
+      </div>
+      <div id="hero-graph-wrap" class="hidden">
+        <div id="onto-graph-box" class="onto-graph-box"></div>
+      </div>
+    </section>
+
+    <!-- 3-Column Core Workbench -->
+    <section class="grid-3">
+      <!-- Left Pane: Real Huawei Configs + vrp-ir JSON -->
+      <div class="pane">
+        <div class="pane-head">
+          <div class="pane-title">📄 真实华为配置 &amp; vrp-ir</div>
+          <div style="display:flex;gap:6px;align-items:center;">
+            <div id="dev-tabs" class="mini-tabs">
+              <button type="button" data-dev="R1" aria-selected="true">R1</button>
+              <button type="button" data-dev="USG1" aria-selected="false">USG1</button>
+              <button type="button" data-dev="R2" aria-selected="false">R2</button>
+            </div>
+            <div id="left-mode-tabs" class="mini-tabs">
+              <button type="button" data-mode="cfg" aria-selected="true">配置</button>
+              <button type="button" data-mode="ir" aria-selected="false">vrp-ir</button>
+            </div>
+          </div>
+        </div>
+        <div id="left-body" class="pane-body"></div>
+      </div>
+
+      <!-- Middle Pane: Computed Functions (F) & Invariants (I) -->
+      <div class="pane">
+        <div class="pane-head">
+          <div class="pane-title">⚙️ 本体计算函数 (F) 与不变量 (I)</div>
+          <span class="pane-badge">Z3 5.4 + LPM</span>
+        </div>
+        <div id="mid-body" class="pane-body"></div>
+      </div>
+
+      <!-- Right Pane: Sandbox Multi-Branch Explorer & Diff-Guided Planner -->
+      <div class="pane">
+        <div class="pane-head">
+          <div class="pane-title">🔀 沙箱分支推演与差分规划 (A → Δ)</div>
+          <span id="plan-badge" class="pane-badge">待运行</span>
+        </div>
+        <div id="right-body" class="pane-body"></div>
+        <div class="llm-bar">
+          <input id="llm-prompt" class="llm-input" type="text" placeholder="（可选 BYOK）输入自然语言指令让 LLM 提出候选 Action，送入 Z3 沙箱校验..." />
+          <button type="button" id="btn-llm-propose" class="llm-btn">🤖 LLM 提案</button>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Benchmark Comparison Modal -->
+  <div id="bench-modal" class="modal-backdrop hidden">
+    <div class="modal-card wide">
+      <div class="modal-head">
+        <div class="modal-title">📊 实测对比：传统方案（无差分/单点修复） vs 可执行动态本体</div>
+        <button type="button" id="btn-close-bench" class="modal-close">✕</button>
+      </div>
+      <div id="bench-body" class="modal-body">计算中...</div>
+    </div>
+  </div>
+
+  <!-- Optional BYOK API Key Modal -->
+  <div id="api-modal" class="modal-backdrop hidden">
+    <div class="modal-card">
+      <div class="modal-head">
+        <div class="modal-title">🔑 可选 BYOK LLM 设置（仅“LLM 提案”需要；沙箱规划免 Key）</div>
+        <button type="button" id="btn-close-api" class="modal-close">✕</button>
+      </div>
+      <div class="modal-body">
+        <p class="muted-note">核心的动态本体映射、Z3 形式化差分与多分支沙箱规划完全在本地运行，<strong>不需要任何 API Key</strong>。仅当你希望用 DeepSeek / OpenAI 现场生成自由提案送入 Z3 沙箱验真时填写即可（仅存你浏览器本地）。</p>
+        <label class="field-group">
+          <span>API Key</span>
+          <input id="input-key" class="modal-input" type="password" placeholder="sk-..." />
+        </label>
+        <div class="field-row">
+          <label class="field-group">
+            <span>Base URL</span>
+            <input id="input-url" class="modal-input" type="url" value="https://api.deepseek.com/v1" />
+          </label>
+          <label class="field-group">
+            <span>Model</span>
+            <input id="input-model" class="modal-input" type="text" value="deepseek-chat" />
+          </label>
+        </div>
+      </div>
+      <div class="modal-foot">
+        <button type="button" id="btn-clear-key" class="danger-ghost">清除密钥</button>
+        <button type="button" id="btn-save-key" class="primary-action-btn">保存</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="/static/app.js"></script>
+</body>
+</html>
